@@ -369,24 +369,20 @@
         const API_URL = 'http://localhost:5000/chat';
         const HEALTH_URL = 'http://localhost:5000/health';
         
-        // State
+        // State — history lives only in this array for the lifetime of this page load.
+        // Refresh or close the tab → array is gone → chat is gone.
         let conversationHistory = [];
-        let sessionId = generateSessionId();
         let isProcessing = false;
         let serverOnline = false;
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             checkServerHealth();
-            setInterval(checkServerHealth, 30000); // Check every 30 seconds
+            setInterval(checkServerHealth, 30000);
             setupInputHandlers();
             updateTimestamp();
-            loadHistoryFromStorage();
+            // No history is loaded — chat starts empty every page load.
         });
-
-        function generateSessionId() {
-            return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        }
 
         function setupInputHandlers() {
             const input = document.getElementById('messageInput');
@@ -549,10 +545,9 @@
                     },
                     body: JSON.stringify({
                         message: message,
-                        history: conversationHistory,
-                        session_id: sessionId
+                        history: conversationHistory
                     }),
-                    signal: AbortSignal.timeout(30000) // 30 second timeout
+                    signal: AbortSignal.timeout(30000)
                 });
 
                 hideTypingIndicator();
@@ -568,15 +563,13 @@
                     document.getElementById('emergencyBanner').classList.add('active');
                 }
 
-                // Add assistant response
+                // Add assistant response to UI and in-memory history only
                 addMessage('assistant', data.reply, data.is_emergency);
                 conversationHistory.push({
                     role: 'assistant',
                     content: data.reply
                 });
-
-                // Save to storage
-                saveHistoryToStorage();
+                // Nothing is saved to storage. History exists only in memory.
 
             } catch (error) {
                 hideTypingIndicator();
@@ -604,7 +597,7 @@
                 return;
             }
 
-            // Clear UI
+            // Reset UI to the initial welcome message
             const chatContainer = document.getElementById('chatContainer');
             chatContainer.innerHTML = `
                 <div class="message assistant">
@@ -616,70 +609,15 @@
             `;
             updateTimestamp();
 
-            // Clear history
+            // Wipe the in-memory history — that is the only place it exists
             conversationHistory = [];
-            sessionId = generateSessionId();
 
-            // Clear emergency banner
+            // Hide the emergency banner
             document.getElementById('emergencyBanner').classList.remove('active');
 
-            // Clear storage
-            clearHistoryFromStorage();
-
-            // Notify server
-            fetch('http://localhost:5000/chat/clear', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    session_id: sessionId
-                })
-            }).catch(err => console.error('Error clearing session:', err));
+            // Nothing else to do. No storage to clear, no server to notify.
         }
 
-        // Local storage functions
-        function saveHistoryToStorage() {
-            try {
-                localStorage.setItem('soulene_history', JSON.stringify(conversationHistory));
-                localStorage.setItem('soulene_session', sessionId);
-            } catch (error) {
-                console.error('Failed to save history:', error);
-            }
-        }
-
-        function loadHistoryFromStorage() {
-            try {
-                const savedHistory = localStorage.getItem('soulene_history');
-                const savedSession = localStorage.getItem('soulene_session');
-                
-                if (savedHistory && savedSession) {
-                    conversationHistory = JSON.parse(savedHistory);
-                    sessionId = savedSession;
-                    
-                    // Restore messages to UI
-                    conversationHistory.forEach(msg => {
-                        addMessage(msg.role, msg.content);
-                    });
-                }
-            } catch (error) {
-                console.error('Failed to load history:', error);
-            }
-        }
-
-        function clearHistoryFromStorage() {
-            try {
-                localStorage.removeItem('soulene_history');
-                localStorage.removeItem('soulene_session');
-            } catch (error) {
-                console.error('Failed to clear history:', error);
-            }
-        }
-
-        // Handle page unload
-        window.addEventListener('beforeunload', function() {
-            saveHistoryToStorage();
-        });
     </script>
 </body>
 </html>
