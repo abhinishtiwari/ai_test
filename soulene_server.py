@@ -15,10 +15,10 @@ if sys.version_info >= (3, 14):
     )
 
 import google.generativeai as genai
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 
 # ===== LOGGING SETUP =====
 logging.basicConfig(
@@ -30,7 +30,13 @@ logger = logging.getLogger(__name__)
 # ===== CONFIGURATION =====
 class Config:
     """Application configuration"""
-    API_KEY = os.getenv('GOOGLE_API_KEY', 'AIzaSyDCnHKDc49Qfxh1expBsB-S_CIUvCBBQ3Y')  # TODO: Move to env
+    API_KEY = os.getenv('GOOGLE_API_KEY')
+    if not API_KEY:
+        raise ValueError(
+            "GOOGLE_API_KEY environment variable is required. "
+            "Please set it before running the server. "
+            "See env.example.txt for setup instructions."
+        )
     FLASK_PORT = int(os.getenv('FLASK_PORT', 5000))
     FLASK_HOST = os.getenv('FLASK_HOST', '0.0.0.0')
     DEBUG_MODE = os.getenv('DEBUG_MODE', 'True').lower() == 'true'
@@ -655,18 +661,9 @@ class SouleneServer:
                 "timestamp": datetime.now().isoformat()
             }), 200
         
-        @self.app.route('/', methods=['GET'])
-        def root():
-            """Root endpoint"""
-            return jsonify({
-                "status": "ok",
-                "message": "Soulene server - use /chat (POST) for interactions",
-                "endpoints": {
-                    "health": "/health",
-                    "chat": "/chat",
-                    "clear": "/chat/clear"
-                }
-            }), 200
+        @self.app.route('/')
+        def ui():
+            return render_template("chat_interface.html")
         
         @self.app.route('/chat', methods=['GET'])
         def chat_info():
